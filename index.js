@@ -1,3 +1,4 @@
+const { renewOrgPlan } = require('./lambda/renewOrgPlan');
 const { renewPlanLambda } = require('./lambda/renewPlanLambda');
 
 exports.handler = async (event) => {
@@ -6,6 +7,11 @@ exports.handler = async (event) => {
         if(event.type=='renew-plan')
         {
             return await renewPlanLambda(event)   
+        }
+
+        if(event.type=='renew-org-plan')
+        {
+            return await renewOrgPlan(event)   
         }
         else
         {

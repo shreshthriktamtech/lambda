@@ -1,37 +1,11 @@
-const Customer = require('../models/Customer');
 const Plan = require('../models/Plan');
 const Invoice = require('../models/Invoice');
 const Transaction = require('../models/Transaction');
 const { descriptions } = require('./constants');
+const organizationModel = require('../models/organizationModel');
 
 
-const findCustomerById = async (session, customerId) => {
-    try {
-        return await Customer.findById(customerId).session(session);
-    } catch (error) {
-        console.error('Error finding customer:', error);
-        throw new Error('Error finding customer');
-    }
-};
-
-const findCurrentActivePlan = async(session, customerId)=>{
-    try {
-        const customerPlan = await Customer.findOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
-            { 'pricingPlans.$': 1 },
-            { session }
-        );
-
-        if (customerPlan && customerPlan.pricingPlans.length > 0) {
-            return customerPlan.pricingPlans[0];
-        } else {
-            return null;
-        }
-    } catch (error) {
-        throw error;
-    }
-}
-
+// find plan buy id
 const findPlanById = async (session, planId) => {
     try {
         return await Plan.findById(planId).session(session);
@@ -41,15 +15,42 @@ const findPlanById = async (session, planId) => {
     }
 };
 
-const renewPackagePlan = async (session, customerId, activePlan) => {
+const findOrganizationById = async (session, organizationId) => {
     try {
-        console.log(`Renewing package plan for customer: ${customerId}, plan: ${activePlan.planId}`);
+        return await organizationModel.findById(organizationId).session(session);
+    } catch (error) {
+        console.error('Error finding organization', error);
+        throw new Error('Error finding organization');
+    }
+};
 
-        const customer = await findCustomerById(session, customerId);
-        if (!customer) {
-            throw new Error('Customer not found');
+const findCurrentActivePlan = async(session, organizationId)=>{
+    try {
+        const organizationPlan = await organizationModel.findOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
+            { 'pricingPlans.$': 1 },
+            { session }
+        );
+
+        if (organizationPlan && organizationPlan.pricingPlans.length > 0) {
+            return organizationPlan.pricingPlans[0];
+        } else {
+            return null;
         }
-        console.log(`Customer found: ${customer._id}`);
+    } catch (error) {
+        throw error;
+    }
+}
+
+const renewPackagePlan = async (session, organizationId, activePlan) => {
+    try {
+        console.log(`Renewing package plan for organization: ${organizationId}, plan: ${activePlan.planId}`);
+
+        const organization = await findOrganizationById(session, organizationId);
+        if (!organization) {
+            throw new Error('organization not found');
+        }
+        console.log(`organization found: ${organization._id}`);
 
         const plan = await findPlanById(session, activePlan.planId);
         if (!plan) {
@@ -67,8 +68,9 @@ const renewPackagePlan = async (session, customerId, activePlan) => {
         const newRenewalDate = calculateRenewalDate(renewalDate, activePlan.details.quotaValidity);
         console.log(`New renewal date calculated: ${newRenewalDate}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.details.interviewsUsed': 0,
@@ -80,37 +82,37 @@ const renewPackagePlan = async (session, customerId, activePlan) => {
             },
             { session },
         );
-        console.log(`Customer plan updated for customer: ${customerId}`);
+        console.log(`organization plan updated for organization: ${organizationId}`);
 
-        if (customer.paymentType == 'Postpaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for postpaid customer: ${customerId}`);
+        if (organization.paymentType == 'postpaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for postpaid organization: ${organizationId}`);
         }
 
         let note = `Package Renewal of ${plan.name}`;
         note = `${getNotes('PackageRenewal')} ${plan.name}`;
-        await handleTransactionPayment(session, customerId, plan.price, 'PackageRenewal', note);
-        console.log(`Transaction payment handled for customer: ${customerId}, plan: ${plan.name}`);
+        await handleTransactionPayment(session, organizationId, plan.price, 'PackageRenewal', note);
+        console.log(`Transaction payment handled for organization: ${organizationId}, plan: ${plan.name}`);
 
-        if (customer.paymentType == 'Prepaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for prepaid customer: ${customerId}`);
+        if (organization.paymentType == 'prepaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for prepaid organization: ${organizationId}`);
         }
     } catch (error) {
-        console.log(`Error renewing package plan for customer: ${customerId} - ${error.message}`);
+        console.log(`Error renewing package plan for organization: ${organizationId} - ${error.message}`);
         throw new Error(error.message);
     }
 };
 
-const renewProRatedPackagePlan = async (session, customerId, activePlan) => {
+const renewProRatedPackagePlan = async (session, organizationId, activePlan) => {
     try {
-        console.log(`Renewing pro-rated package plan for customer: ${customerId}, plan: ${activePlan.planId}`);
+        console.log(`Renewing pro-rated package plan for organization: ${organizationId}, plan: ${activePlan.planId}`);
 
-        const customer = await findCustomerById(session, customerId);
-        if (!customer) {
-            throw new Error('Customer not found');
+        const organization = await findOrganizationById(session, organizationId);
+        if (!organization) {
+            throw new Error('organization not found');
         }
-        console.log(`Customer found: ${customer._id}`);
+        console.log(`organization found: ${organization._id}`);
 
         const plan = await findPlanById(session, activePlan.planId);
         if (!plan) {
@@ -120,23 +122,23 @@ const renewProRatedPackagePlan = async (session, customerId, activePlan) => {
 
         const date = new Date();
 
-        if (customer.paymentType == 'Postpaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for postpaid customer: ${customerId}`);
+        if (organization.paymentType == 'postpaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for postpaid organization: ${organizationId}`);
         }
 
         let note = `Package Renewal of ${plan.name}`;
         note = `${getNotes('PackageRenewal')} ${plan.name}`;
-        await handleTransactionPayment(session, customerId, plan.price, 'PackageRenewal', note);
-        console.log(`Transaction payment handled for customer: ${customerId}, plan: ${plan.name}`);
+        await handleTransactionPayment(session, organizationId, plan.price, 'PackageRenewal', note);
+        console.log(`Transaction payment handled for organization: ${organizationId}, plan: ${plan.name}`);
 
-        if (customer.paymentType == 'Prepaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for prepaid customer: ${customerId}`);
+        if (organization.paymentType == 'prepaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for prepaid organization: ${organizationId}`);
         }
 
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.isActive': false,
@@ -145,26 +147,26 @@ const renewProRatedPackagePlan = async (session, customerId, activePlan) => {
             },
             { session }
         );
-        console.log(`Customer plan deactivated for customer: ${customerId}`);
+        console.log(`organization plan deactivated for organization: ${organizationId}`);
 
         const renewalDate = calculateRenewalDate(date, plan.quotaValidity);
-        await createNewPackagePlan(session, customerId, plan, renewalDate, false);
-        console.log(`New package plan created for customer: ${customerId}`);
+        await createNewPackagePlan(session, organizationId, plan, renewalDate, false);
+        console.log(`New package plan created for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error renewing pro-rated package plan for customer: ${customerId} - ${error.message}`);
+        console.log(`Error renewing pro-rated package plan for organization: ${organizationId} - ${error.message}`);
         throw new Error('Error in renew a proRated Package Plan');
     }
 };
 
-const renewProRatedPayAsYouGoPlan = async (session, customerId, activePlan) => {
+const renewProRatedPayAsYouGoPlan = async (session, organizationId, activePlan) => {
     try {
-        console.log(`Renewing pro-rated pay-as-you-go plan for customer: ${customerId}, plan: ${activePlan.planId}`);
+        console.log(`Renewing pro-rated pay-as-you-go plan for organization: ${organizationId}, plan: ${activePlan.planId}`);
 
-        const customer = await findCustomerById(session, customerId);
-        if (!customer) {
-            throw new Error('Customer not found');
+        const organization = await findOrganizationById(session, organizationId);
+        if (!organization) {
+            throw new Error('organization not found');
         }
-        console.log(`Customer found: ${customer._id}`);
+        console.log(`organization found: ${organization._id}`);
 
         const plan = await findPlanById(session, activePlan.planId);
         if (!plan) {
@@ -173,11 +175,11 @@ const renewProRatedPayAsYouGoPlan = async (session, customerId, activePlan) => {
         console.log(`Plan found: ${plan._id}`);
 
         const date = new Date();
-        await billGeneration(session, customerId);
-        console.log(`Bill generated for customer: ${customerId}`);
+        await billGeneration(session, organizationId);
+        console.log(`Bill generated for organization: ${organizationId}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.isActive': false,
@@ -186,29 +188,29 @@ const renewProRatedPayAsYouGoPlan = async (session, customerId, activePlan) => {
             },
             { session }
         );
-        console.log(`Customer plan deactivated for customer: ${customerId}`);
+        console.log(`organization plan deactivated for organization: ${organizationId}`);
 
         const renewalDate = calculateRenewalDate(date, "monthly");
-        await createNewPayAsYouGoPlan(session, customerId, plan, renewalDate, false);
-        console.log(`New pay-as-you-go plan created for customer: ${customerId}`);
+        await createNewPayAsYouGoPlan(session, organizationId, plan, renewalDate, false);
+        console.log(`New pay-as-you-go plan created for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error renewing pay-as-you-go plan for customer: ${customerId} - ${error.message}`);
+        console.log(`Error renewing pay-as-you-go plan for organization: ${organizationId} - ${error.message}`);
         throw new Error('Error in renewing the payAsYouGo plan');
     }
 };
 
-const changePlan = async (session, customerId, currentPlan) => {
+const changePlan = async (session, organizationId, currentPlan) => {
     try {
-        console.log(`Changing plan for customer: ${customerId}, current plan: ${currentPlan.planId}`);
+        console.log(`Changing plan for organization: ${organizationId}, current plan: ${currentPlan.planId}`);
 
-        const customer = await findCustomerById(session, customerId);
-        if (!customer) {
-            throw new Error('Customer not found');
+        const organization = await findOrganizationById(session, organizationId);
+        if (!organization) {
+            throw new Error('organization not found');
         }
-        console.log(`Customer found: ${customer._id}`);
+        console.log(`organization found: ${organization._id}`);
 
         const plan = await findPlanById(session, currentPlan.planId);
-        const changePlan = await findPlanById(session, customer.changePlanRequest.planId);
+        const changePlan = await findPlanById(session, organization.changePlanRequest.planId);
         if (!plan || !changePlan) {
             throw new Error('Plan not found');
         }
@@ -222,46 +224,46 @@ const changePlan = async (session, customerId, currentPlan) => {
                 throw new Error("Renewal date is in the future, plan cannot be renewed yet");
             }
             if (changePlan.type == 'Package') {
-                await changePlanFromPackageToPackage(session, customer, plan, changePlan);
+                await changePlanFromPackageToPackage(session, organization, plan, changePlan);
             }
             if (changePlan.type == 'PayAsYouGo') {
-                await changePlanFromPackageToPayAsYouGo(session, customer, plan, changePlan);
+                await changePlanFromPackageToPayAsYouGo(session, organization, plan, changePlan);
             }
         }
         if (currentPlan.type == 'PayAsYouGo') {
             if (changePlan.type == 'Package') {
-                await changePlanFromPayAsYouGoToPackage(session, customer, currentPlan, changePlan);
+                await changePlanFromPayAsYouGoToPackage(session, organization, currentPlan, changePlan);
             }
         }
-        console.log(`Plan changed successfully for customer: ${customerId}`);
+        console.log(`Plan changed successfully for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error changing plan for customer: ${customerId} - ${error.message}`);
+        console.log(`Error changing plan for organization: ${organizationId} - ${error.message}`);
         throw new Error('Something went wrong here');
     }
 };
 
-const changePlanFromPackageToPackage = async (session, customer, currentPlan, changePlan) => {
+const changePlanFromPackageToPackage = async (session, organization, currentPlan, changePlan) => {
     try {
-        console.log(`Changing plan from package to package for customer: ${customer._id}`);
+        console.log(`Changing plan from package to package for organization: ${organization._id}`);
 
-        const customerId = customer._id;
-        if (customer.paymentType == 'Postpaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for postpaid customer: ${customerId}`);
+        const organizationId = organization._id;
+        if (organization.paymentType == 'postpaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for postpaid organization: ${organizationId}`);
         }
 
         let note = `${getNotes('ChangePlan')} ${changePlan.name}`;
-        await handleTransactionPayment(session, customerId, changePlan.price, 'ChangePlan', note);
-        console.log(`Transaction payment handled for customer: ${customerId}, change plan: ${changePlan.name}`);
+        await handleTransactionPayment(session, organizationId, changePlan.price, 'ChangePlan', note);
+        console.log(`Transaction payment handled for organization: ${organizationId}, change plan: ${changePlan.name}`);
 
-        if (customer.paymentType == 'Prepaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for prepaid customer: ${customerId}`);
+        if (organization.paymentType == 'prepaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for prepaid organization: ${organizationId}`);
         }
 
         const date = new Date();
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.isActive': false,
@@ -270,34 +272,34 @@ const changePlanFromPackageToPackage = async (session, customer, currentPlan, ch
             },
             { session }
         );
-        console.log(`Customer plan deactivated for customer: ${customerId}`);
+        console.log(`organization plan deactivated for organization: ${organizationId}`);
 
         const renewalDate = calculateRenewalDate(date, changePlan.quotaValidity);
-        await createNewPackagePlan(session, customerId, changePlan, renewalDate, false);
-        console.log(`New package plan created for customer: ${customerId}`);
+        await createNewPackagePlan(session, organizationId, changePlan, renewalDate, false);
+        console.log(`New package plan created for organization: ${organizationId}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'changePlanRequest.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'changePlanRequest.isActive': true },
             { $set: { 'changePlanRequest.isActive': false } },
             { session }
         );
-        console.log(`Change plan request deactivated for customer: ${customerId}`);
+        console.log(`Change plan request deactivated for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error changing package to package for customer: ${customer._id} - ${error.message}`);
+        console.log(`Error changing package to package for organization: ${organization._id} - ${error.message}`);
         throw new Error('In change Package');
     }
 };
 
-const changePlanFromPackageToPayAsYouGo = async (session, customer, currentPlan, changePlan) => {
+const changePlanFromPackageToPayAsYouGo = async (session, organization, currentPlan, changePlan) => {
     try {
-        console.log(`Changing plan from package to pay-as-you-go for customer: ${customer._id}`);
+        console.log(`Changing plan from package to pay-as-you-go for organization: ${organization._id}`);
 
-        const customerId = customer._id;
-        await billGeneration(session, customerId);
-        console.log(`Bill generated for customer: ${customerId}`);
+        const organizationId = organization._id;
+        await billGeneration(session, organizationId);
+        console.log(`Bill generated for organization: ${organizationId}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.isActive': false,
@@ -306,47 +308,47 @@ const changePlanFromPackageToPayAsYouGo = async (session, customer, currentPlan,
             },
             { session }
         );
-        console.log(`Customer plan deactivated for customer: ${customerId}`);
+        console.log(`organization plan deactivated for organization: ${organizationId}`);
 
         const date = new Date();
         const renewalDate = calculateRenewalDate(date, "monthly");
-        await createNewPayAsYouGoPlan(session, customerId, changePlan, renewalDate, false);
-        console.log(`New pay-as-you-go plan created for customer: ${customerId}`);
+        await createNewPayAsYouGoPlan(session, organizationId, changePlan, renewalDate, false);
+        console.log(`New pay-as-you-go plan created for organization: ${organizationId}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'changePlanRequest.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'changePlanRequest.isActive': true },
             { $set: { 'changePlanRequest.isActive': false } },
             { session }
         );
-        console.log(`Change plan request deactivated for customer: ${customerId}`);
+        console.log(`Change plan request deactivated for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error changing package to pay-as-you-go for customer: ${customer._id} - ${error.message}`);
+        console.log(`Error changing package to pay-as-you-go for organization: ${organization._id} - ${error.message}`);
         throw new Error('Error in changePlanFromPackageToPayAsYouGo');
     }
 };
 
-const changePlanFromPayAsYouGoToPackage = async (session, customer, currentPlan, changePlan) => {
+const changePlanFromPayAsYouGoToPackage = async (session, organization, currentPlan, changePlan) => {
     try {
-        console.log(`Changing plan from pay-as-you-go to package for customer: ${customer._id}`);
+        console.log(`Changing plan from pay-as-you-go to package for organization: ${organization._id}`);
 
-        const customerId = customer._id;
-        if (customer.paymentType == 'Postpaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for postpaid customer: ${customerId}`);
+        const organizationId = organization._id;
+        if (organization.paymentType == 'postpaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for postpaid organization: ${organizationId}`);
         }
 
         let note = `${getNotes('ChangePlan')} ${changePlan.name}`;
-        await handleTransactionPayment(session, customerId, changePlan.price, 'ChangePlan', note);
-        console.log(`Transaction payment handled for customer: ${customerId}, change plan: ${changePlan.name}`);
+        await handleTransactionPayment(session, organizationId, changePlan.price, 'ChangePlan', note);
+        console.log(`Transaction payment handled for organization: ${organizationId}, change plan: ${changePlan.name}`);
 
-        if (customer.paymentType == 'Prepaid') {
-            await billGeneration(session, customerId);
-            console.log(`Bill generated for prepaid customer: ${customerId}`);
+        if (organization.paymentType == 'prepaid') {
+            await billGeneration(session, organizationId);
+            console.log(`Bill generated for prepaid organization: ${organizationId}`);
         }
 
         const date = new Date();
-        await Customer.updateOne(
-            { _id: customerId, 'pricingPlans.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'pricingPlans.isActive': true },
             {
                 $set: {
                     'pricingPlans.$.isActive': false,
@@ -355,43 +357,43 @@ const changePlanFromPayAsYouGoToPackage = async (session, customer, currentPlan,
             },
             { session }
         );
-        console.log(`Customer plan deactivated for customer: ${customerId}`);
+        console.log(`organization plan deactivated for organization: ${organizationId}`);
 
         const renewalDate = calculateRenewalDate(date, changePlan.quotaValidity);
-        await createNewPackagePlan(session, customerId, changePlan, renewalDate, false);
-        console.log(`New package plan created for customer: ${customerId}`);
+        await createNewPackagePlan(session, organizationId, changePlan, renewalDate, false);
+        console.log(`New package plan created for organization: ${organizationId}`);
 
-        await Customer.updateOne(
-            { _id: customerId, 'changePlanRequest.isActive': true },
+        await organizationModel.updateOne(
+            { _id: organizationId, 'changePlanRequest.isActive': true },
             { $set: { 'changePlanRequest.isActive': false } },
             { session }
         );
-        console.log(`Change plan request deactivated for customer: ${customerId}`);
+        console.log(`Change plan request deactivated for organization: ${organizationId}`);
     } catch (error) {
-        console.log(`Error changing pay-as-you-go to package for customer: ${customer._id} - ${error.message}`);
-        throw new Error(`Error changing pay-as-you-go to package for customer: ${customer._id} - ${error.message}`);
+        console.log(`Error changing pay-as-you-go to package for organization: ${organization._id} - ${error.message}`);
+        throw new Error(`Error changing pay-as-you-go to package for organization: ${organization._id} - ${error.message}`);
     }
 };
 
-const handleTransactionPayment = async (session, customerId, amount, transactionType, note) => {
+const handleTransactionPayment = async (session, organizationId, amount, transactionType, note) => {
     try {
-        console.log(`Handling payment for customer ID: ${customerId} at price: ${amount}`);
+        console.log(`Handling payment for organization ID: ${organizationId} at price: ${amount}`);
 
-        // Fetch the customer details from the database
-        const customer = await Customer.findById(customerId).session(session);
-        if (!customer) {
-            console.log('Customer not found during payment processing');
-            throw new Error('Customer Not Found');
+        // Fetch the organization details from the database
+        const organization = await organizationModel.findById(organizationId).session(session);
+        if (!organization) {
+            console.log('organization not found during payment processing');
+            throw new Error('organization Not Found');
         }
 
         // Calculate the tax and total amount for the transaction
-        const taxRate = customer.tax;
+        const taxRate = organization.tax;
         const price = parseInt(amount);
         const taxAmount = Math.ceil((price * taxRate) / 100);
         const totalAmount = price + taxAmount;
 
         // Initialize balance variables
-        let currentBalance = customer.currentBalance;
+        let currentBalance = organization.currentBalance;
         let beforeUpdateCurrentBalance = currentBalance;
         let afterUpdateCurrentBalance;
 
@@ -400,7 +402,7 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
         // Default transaction status
         let status = 'unbilled';
 
-        // Case 1: Customer's current balance is sufficient to cover the total amount
+        // Case 1: organization's current balance is sufficient to cover the total amount
         if (currentBalance >= totalAmount) {
             currentBalance -= totalAmount;
             afterUpdateCurrentBalance = currentBalance;
@@ -409,7 +411,7 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
             // Create a transaction with status 'completed'
             await createTransaction(
                 session,
-                customerId,
+                organizationId,
                 transactionType,
                 status,
                 {
@@ -424,7 +426,7 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
                 'debit'
             );
 
-        // Case 2: Customer's current balance is partially sufficient
+        // Case 2: organization's current balance is partially sufficient
         } else if (currentBalance > 0) {
             // Calculate the amount still due after using the current balance
             let remainingAmountDue = totalAmount - currentBalance;
@@ -436,7 +438,7 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
             // Create a transaction for the portion covered by the current balance
             await createTransaction(
                 session,
-                customerId,
+                organizationId,
                 transactionType,
                 'completed',
                 {
@@ -462,7 +464,7 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
             // Create a transaction for the remaining amount to be billed
             await createTransaction(
                 session,
-                customerId,
+                organizationId,
                 transactionType,
                 'unbilled',
                 {
@@ -477,14 +479,14 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
                 'debit'
             );
 
-        // Case 3: Customer's current balance is insufficient to cover any part of the total amount
+        // Case 3: organization's current balance is insufficient to cover any part of the total amount
         } else {
             afterUpdateCurrentBalance = currentBalance - totalAmount;
 
             // Create a transaction with status 'unbilled'
             await createTransaction(
                 session,
-                customerId,
+                organizationId,
                 transactionType,
                 'unbilled',
                 {
@@ -500,8 +502,8 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
             );
         }
 
-        // Update the customer's current balance in the database
-        await Customer.findByIdAndUpdate(customerId, {
+        // Update the organization's current balance in the database
+        await organizationModel.findByIdAndUpdate(organizationId, {
             $set: { currentBalance: afterUpdateCurrentBalance }
         }, { new: true, session });
 
@@ -514,11 +516,11 @@ const handleTransactionPayment = async (session, customerId, amount, transaction
     }
 };
 
-const createTransaction = async (session, customerId, type, status, details, beforeUpdateCurrentBalance, afterUpdateCurrentBalance, transactionType) => {
+const createTransaction = async (session, organizationId, type, status, details, beforeUpdateCurrentBalance, afterUpdateCurrentBalance, transactionType) => {
     try {
         const date = new Date();
         const transaction = new Transaction({
-            customerId: customerId,
+            organizationId: organizationId,
             type: type,
             date: date,
             status: status,
@@ -537,23 +539,23 @@ const createTransaction = async (session, customerId, type, status, details, bef
     }
 };
 
-const billGeneration = async (session, customerId) => {   
+const billGeneration = async (session, organizationId) => {   
     try {
-        console.log(`Starting bill generation for customer ID: ${customerId}`);
+        console.log(`Starting bill generation for organization ID: ${organizationId}`);
 
-        const customer = await findCustomerById(session, customerId);
-        if (!customer) {
-            console.error(`Customer not found for ID: ${customerId}`);
-            throw new Error('Customer not found');
+        const organization = await findOrganizationById(session, organizationId);
+        if (!organization) {
+            console.error(`organization not found for ID: ${organizationId}`);
+            throw new Error('organization not found');
         }
 
         let criteria = {
-            customerId: customerId,
+            organizationId: organizationId,
             status: 'unbilled'
         };
 
         const transactions = await Transaction.find(criteria).session(session);
-        console.log(`Found ${transactions.length} unbilled transactions for customer ID: ${customerId}`);
+        console.log(`Found ${transactions.length} unbilled transactions for organization ID: ${organizationId}`);
 
         if (transactions.length > 0) {
             const totalAmount = transactions.reduce((acc, transaction) => acc + (transaction.details.amount || 0), 0);
@@ -571,7 +573,7 @@ const billGeneration = async (session, customerId) => {
             });
 
             const invoiceData = {
-                customerId: customerId,
+                organizationId: organizationId,
                 totalAmount,
                 totalPrice,
                 totalTax,
@@ -579,14 +581,14 @@ const billGeneration = async (session, customerId) => {
             };
 
             await createInvoice(session, invoiceData);
-            console.log(`Invoice created for customer ID: ${customerId} with total amount: ${totalAmount}`);
+            console.log(`Invoice created for organization ID: ${organizationId} with total amount: ${totalAmount}`);
             await billTransactions(session, criteria);
             const data = {
-                customerId,
+                organizationId,
                 amount: totalAmount
             };
             await updateOutstandingBalance(session, data);
-            console.log(`Updated outstanding balance for customer ID: ${customerId} by amount: ${totalAmount}`);
+            console.log(`Updated outstanding balance for organization ID: ${organizationId} by amount: ${totalAmount}`);
         }
     } catch (error) {
         console.error(`Error generating invoice: ${error.message}`);
@@ -606,12 +608,12 @@ const calculateRenewalDate = (startDate, quotaValidity) => {
     return renewalDate;
 };
 
-const createNewPackagePlan = async (session, customerId, plan, renewalDate, isProRated) => {
+const createNewPackagePlan = async (session, organizationId, plan, renewalDate, isProRated) => {
     try {
-        console.log(`Creating new package plan for customer ID: ${customerId} with plan ID: ${plan._id}`);
-        const customer = await Customer.findById(customerId).session(session);
+        console.log(`Creating new package plan for organization ID: ${organizationId} with plan ID: ${plan._id}`);
+        const organization = await organizationModel.findById(organizationId).session(session);
         const date = new Date();
-        const newCustomerPlan = {
+        const neworganizationPlan = {
             planId: plan._id,
             startDate: date,
             endDate: null,
@@ -625,31 +627,59 @@ const createNewPackagePlan = async (session, customerId, plan, renewalDate, isPr
                 additionalInterviewRate: plan.additionalInterviewRate,
                 interviewsUsed: 0,
                 quotaValidity: plan.quotaValidity,
+                additionalInterviewsUsed: 0
             },
             renewalDate,
             isProRated
         };
-        console.log(`New package plan details: ${JSON.stringify(newCustomerPlan)}`);
+        console.log(`New package plan details: ${JSON.stringify(neworganizationPlan)}`);
 
-        customer.pricingPlans.push(newCustomerPlan);
-        await customer.save({ session });
-        console.log(`Package plan saved for customer ID: ${customerId}`);
+        organization.pricingPlans.push(neworganizationPlan);
+        await organization.save({ session });
+        console.log(`Package plan saved for organization ID: ${organizationId}`);
     } catch (error) {
-        console.error(`Error creating package plan for customer ID: ${customerId}: ${error.message}`);
+        console.error(`Error creating package plan for organization ID: ${organizationId}: ${error.message}`);
         throw new Error('Error in creating the Package');
+    }
+};
+
+const createNewPayAsYouGoPlan = async (session, organizationId, plan, renewalDate) => {
+    try {
+        console.log(`Creating new PayAsYouGo plan for organization ID: ${organizationId} with plan ID: ${plan._id}`);
+        const organization = await organizationModel.findById(organizationId).session(session);
+        const date = new Date(); 
+        const neworganizationPlan = {
+            planId: plan._id,
+            startDate: date,
+            endDate: null,
+            type: 'PayAsYouGo',
+            isActive: true,
+            details: {
+                name: plan.name,
+                interviewRate: organization.interviewRate || plan.interviewRate,
+            },
+            renewalDate,
+        };
+
+        organization.pricingPlans.push(neworganizationPlan);
+        await organization.save({ session });
+        console.log(`PayAsYouGo plan saved for organization ID: ${organizationId}`);
+    } catch (error) {
+        console.error(`Error creating PayAsYouGo plan for organization ID: ${organizationId}: ${error.message}`);
+        throw new Error('Error while creating the PayAsYouGo');
     }
 };
 
 const billTransactions = async (session, data) => {
     try {
-        const { customerId, status } = data;
-        console.log(`Billing transactions for customer ID: ${customerId} with status: ${status}`);
+        const { organizationId, status } = data;
+        console.log(`Billing transactions for organization ID: ${organizationId} with status: ${status}`);
         await Transaction.updateMany(
-            { customerId, status }, 
+            { organizationId, status }, 
             { $set: { status: 'billed' }},
             { session }
         );
-        console.log(`Transactions updated to billed for customer ID: ${customerId}`);
+        console.log(`Transactions updated to billed for organization ID: ${organizationId}`);
     } catch (error) {
         console.error(`Error in function billTransactions in file ${__filename}: ${error.message}`);
         throw new Error('Something went wrong updating transactions');
@@ -658,26 +688,25 @@ const billTransactions = async (session, data) => {
 
 const updateOutstandingBalance = async (session, data) => {
     try {
-        const { customerId, amount } = data;
-        console.log(`Updating outstanding balance for customer ID: ${customerId} by amount: ${amount}`);
-        await Customer.updateOne(
-            { _id: customerId },
+        const { organizationId, amount } = data;
+        console.log(`Updating outstanding balance for organization ID: ${organizationId} by amount: ${amount}`);
+        await organizationModel.updateOne(
+            { _id: organizationId },
             { $inc: { outstandingBalance: amount } },
             { session }
         );
-        console.log(`Outstanding balance updated for customer ID: ${customerId}`);
+        console.log(`Outstanding balance updated for organization ID: ${organizationId}`);
     } catch (error) {
-        console.error(`Error updating outstanding balance for customer ID: ${customerId}: ${error.message}`);
+        console.error(`Error updating outstanding balance for organization ID: ${organizationId}: ${error.message}`);
         throw new Error('Unable to update the outstanding balance');
     }
 };
 
 const createInvoice = async (session, data) => {
     try {
-
-        console.log(`Creating invoice for customer ID: ${data.customerId} with total amount: ${data.totalAmount}`);
+        console.log(`Creating invoice for organization ID: ${data.organizationId} with total amount: ${data.totalAmount}`);
         const newInvoice = new Invoice({
-            customerId: data.customerId,
+            organizationId: data.organizationId,
             issuedDate: new Date(),
             dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             totalAmount: data.totalAmount,
@@ -702,12 +731,12 @@ const getNotes = (transactionType) => {
 
 module.exports = {
     createTransaction,
-    findCustomerById,
     findCurrentActivePlan,
     changePlan,
     renewPackagePlan,
     billGeneration,
     billTransactions,
     renewProRatedPayAsYouGoPlan,
-    renewProRatedPackagePlan
+    renewProRatedPackagePlan,
+    findOrganizationById
 }

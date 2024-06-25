@@ -2,7 +2,7 @@ const { default: mongoose } = require("mongoose");
 const { renewPlan } = require("../services/planService");
 const organizationModel = require("../models/organizationModel");
 
-const renewPlanLambda = async (event) => {
+const renewOrgPlan = async (event) => {
     try {
         console.log('Lambda function starts');
 
@@ -17,27 +17,26 @@ const renewPlanLambda = async (event) => {
 
         console.log(`Running for renewalDate between ${startOfToday} to ${endOfToday}`);
 
-        const organizations = await organizationModel.find({
-            pricingPlans: {
-                $elemMatch: {
-                    isActive: true,
-                    renewalDate: {
-                        $gte: startOfToday,
-                        $lt: endOfToday
-                    }
-                }
+        const organization = await organizationModel.findOne({
+            _id: event.organizationId,
+            'pricingPlans.isActive': true,
+            'pricingPlans.renewalDate': {
+                $gte: startOfToday,
+                $lt: endOfToday
             }
         });
 
-        console.log(`Processing renewal for ${organizations.length} organizations`);
-        for (const organization of organizations) {
-            try {
-                await renewPlan({ organizationId: organization._id });
-                console.log(`Successfully renewed plan for organization ID: ${organization._id}`);
-            } catch (error) {
-                console.error(`Failed to renew plan for organization ID: ${organization._id}, Error: ${error.message}`);
-            }
+        if (!organization) {
+            console.log(`No organization found with ID ${event.organizationId} that needs renewal`);
+            await mongoose.connection.close();
+            return {
+                statusCode: 404,
+                body: JSON.stringify(`No renewal tasks needed for ${startOfToday.toDateString()}`),
+            };
         }
+
+        console.log(`Processing renewal for organization ID: ${organization._id}`);
+        await renewPlan({ organizationId: organization._id });
 
         await mongoose.connection.close();
 
@@ -55,8 +54,8 @@ const renewPlanLambda = async (event) => {
         };
         return response;
     }
-}
+};
 
 module.exports = {
-    renewPlanLambda
-}
+    renewOrgPlan
+};

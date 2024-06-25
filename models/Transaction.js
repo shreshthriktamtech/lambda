@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const transactionSchema = new Schema({
-    customerId: { 
-        type: Schema.Types.ObjectId, 
-        ref: 'Customer' 
-    },
+   organizationId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "organizations",
+	},
     billingCycle: {
         type: String,
     },
