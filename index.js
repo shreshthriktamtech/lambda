@@ -1,20 +1,19 @@
 const { renewOrgPlan } = require('./lambda/renewOrgPlan');
 const { renewPlanLambda } = require('./lambda/renewPlanLambda');
-
+const { sendEmailsToAllUsers } = require('./lambda/AdminReport');
 exports.handler = async (event) => {
-    try
-    {
-        if(event.type=='renew-plan')
-        {
-            return await renewPlanLambda(event)   
+    try {
+        if (event.type == 'renew-plan') {
+            return await renewPlanLambda(event)
         }
 
-        if(event.type=='renew-org-plan')
-        {
-            return await renewOrgPlan(event)   
+        if (event.type == 'renew-org-plan') {
+            return await renewOrgPlan(event)
         }
-        else
-        {
+        else if (event.type == "sendEmailToAdminIn6am12pm3pm6pm") {
+            return await sendEmailsToAllUsers()
+        }
+        else {
             console.log(`Not a valid Event Type`)
             const response = {
                 statusCode: 500,
@@ -23,8 +22,7 @@ exports.handler = async (event) => {
             return response;
         }
     }
-    catch(error)
-    {
+    catch (error) {
         console.log(`Something went wrong in calling the lambda`);
         console.log(error.message);
     }
