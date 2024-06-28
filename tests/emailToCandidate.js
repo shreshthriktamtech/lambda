@@ -1,12 +1,11 @@
-
 require('dotenv').config();
 const { handler } = require('../index');
 
 const mockEvent = {
-    type: 'sendEmailToAdminIn6am12pm3pm6pm',
+    type: 'sendReminderEmailBefore6And1Hours',
 };
 
-async function emailToAdmin() {
+async function emailToCandidate() {
     try {
         return await handler(mockEvent);
     } catch (error) {
@@ -14,4 +13,4 @@ async function emailToAdmin() {
     }
 }
 
-emailToAdmin();
+emailToCandidate();

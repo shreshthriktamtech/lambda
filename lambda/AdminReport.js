@@ -181,10 +181,10 @@ const sendEmailsToAllUsers = async () => {
             cancelled: false,
             interviewCompleted: false,
             activeSession: false
-        }).project({ resumeSummary: 0 }).toArray();
+        }).project({ opening: 1, firstName: 1, lastName: 1, email: 1, phoneNumber: 1, }).toArray();
 
-        const groupedUsers = users.reduce((acc, user) => {
-            const openingId = user.opening.toString();
+        const groupedUsers = users?.reduce((acc, user) => {
+            const openingId = user?.opening.toString();
             if (!acc[openingId]) {
                 acc[openingId] = [];
             }
@@ -192,21 +192,21 @@ const sendEmailsToAllUsers = async () => {
             return acc;
         }, {});
 
-        let openingIds = Object.keys(groupedUsers).map((data) => {
-            return new ObjectId(data)
+        let openingIds = Object.keys(groupedUsers)?.map((data) => {
+            return new ObjectId(data);
         });
 
         const openingInfo = await openings.find({ _id: { $in: openingIds } }).project({ supportEmail: 1, title: 1 }).toArray();
 
         let groupingDetail = [];
-        Object.keys(groupedUsers).forEach(openingId => {
-            const usersInGroup = groupedUsers[openingId];
-            let candidateInfo = usersInGroup.map(user => ({
-                fullName: `${user.firstName} ${user.lastName}`,
-                email: user.email,
-                phoneNumber: user.phoneNumber,
-                experience: user.experience,
-                schedule: getFormattedDateTime4(user.schedule)
+        Object.keys(groupedUsers)?.forEach(openingId => {
+            const usersInGroup = groupedUsers?.[openingId];
+            let candidateInfo = usersInGroup?.map(user => ({
+                fullName: `${user?.firstName} ${user?.lastName}`,
+                email: user?.email,
+                phoneNumber: user?.phoneNumber,
+                experience: user?.experience,
+                schedule: getFormattedDateTime4(user?.schedule)
             }));
             groupingDetail.push({
                 openingId,
@@ -216,8 +216,8 @@ const sendEmailsToAllUsers = async () => {
 
         groupingDetail.forEach(groupingData => {
             openingInfo.forEach(openingData => {
-                if (groupingData.openingId === openingData._id.toString()) {
-                    if (openingData.supportEmail && openingData.supportEmail.length) {
+                if (groupingData?.openingId === openingData?._id.toString()) {
+                    if (openingData?.supportEmail && openingData?.supportEmail?.length) {
                         sendEmailToAdminWhoAreNotJoin(groupingData.candidateInfo, openingData.supportEmail, groupingData.openingId, openingData.title);
                     }
                 }
