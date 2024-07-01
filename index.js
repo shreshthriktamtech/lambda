@@ -2,6 +2,7 @@ const { renewOrgPlan } = require('./lambda/renewOrgPlan');
 const { renewPlanLambda } = require('./lambda/renewPlanLambda');
 const { sendEmailsToAllUsers } = require('./lambda/AdminReport');
 const { OnetimeGetUserToSendReminderEmail } = require('./lambda/emailReminder')
+const { Demo } = require('./lambda/Demo')
 exports.handler = async (event) => {
     try {
         if (event.type == 'renew-plan') {
@@ -15,6 +16,9 @@ exports.handler = async (event) => {
         }
         else if (event.type == "sendReminderEmailBefore6And1Hours") {
             return await OnetimeGetUserToSendReminderEmail();
+        }
+        else if (event.type == "demo") {
+            return await Demo();
         }
         else {
             console.log(`Not a valid Event Type`)

@@ -4,7 +4,6 @@ const aws = require("@aws-sdk/client-ses");
 const dbconnect = require('../connection/connection');
 const { ObjectId } = require('mongodb');
 
-
 const ses = new aws.SES({
     region: process.env.AWS_SES_REGION,
     credentials: {
@@ -31,8 +30,7 @@ function getFormattedDateTime4(dateString) {
     return `${formattedDate}, ${formattedTime}`;
 }
 
-const sendEmailToAdminWhoAreNotJoin = async (groupingDetail, supportEmail, openingId, title) => {
-
+const sendEmailToAdminWhoAreNotJoin = async (groupingDetail, supportEmail, openingId, title, retries = 3) => {
     let htmlTemplate = `
     <!DOCTYPE html>
     <html lang="en">
@@ -46,99 +44,86 @@ const sendEmailToAdminWhoAreNotJoin = async (groupingDetail, supportEmail, openi
                 color: #1a202c;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
                       'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+                line-height: 1.6;
             }
             .container {
-                max-width: 600px;
                 margin: 0 auto;
-                padding: 6px;
             }
             .bg-white {
                 background-color: #ffffff;
-            }
-            .shadow-md {
+                border-radius: 8px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             }
-            .rounded-lg {
-                border-radius: 8px;
+            .text-center {
+                text-align: center;
             }
-            .p-6 {
-                padding: 24px;
+            .logo {
+                display: block;
+                margin: 0 auto;
+                margin-bottom: 20px;
             }
-            .text-xl {
-                text-align: center
-            }
-            .font-bold {
-                font-weight: 700;
-            }
-            .text-indigo-600 {
+            .role {
+                font-size: 17px; 
+                font-weight: 600;
                 color: #5a67d8;
+                text-align: center;
+                margin-bottom: 20px;
             }
-            .mb-4 {
-                margin-bottom: 16px;
+            .info-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
             }
-            .overflow-x-auto {
-                overflow-x: auto;
-            }
-            .min-w-full {
-                min-width: 100%;
-            }
-            .border-b {
+            .info-table th,
+            .info-table td {
+                padding: 12px;
+                text-align: left;
                 border-bottom: 1px solid #e2e8f0;
             }
-            .border-gray-300 {
-                border-color: #e2e8f0;
+            .info-table th {
+                background-color: #f7fafc;
+                font-weight: 600;
+                color: #4a5568;
+                white-space: nowrap; 
+                text-align: center;
             }
-            .py-2 {
-                padding-top: 8px;
-                padding-bottom: 8px;
-            }
-            .px-4 {
-                padding-left: 16px;
-                padding-right: 16px;
-            }
-            .text-center{
+            .info-table td {
+                background-color: #ffffff;
+                white-space: nowrap; 
                 text-align: center;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <div class="bg-white shadow-md rounded-lg p-6">`;
-    htmlTemplate += `
-                            <div class="mb-6">
-                                <div class="text-center mb-6">
-                                <img src="https://staging.zinterview.ai/zi-favicon.png" alt="logo" class="mx-auto mb-8" width="50">
-                                </div>
-                                <h3 class="text-xl font-bold text-indigo-600 mb-4">Role- ${title}</h3>
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full bg-white">
-                                        <thead>
-                                            <tr>
-                                                <th class="py-2 px-4 border-b border-gray-300">Full Name</th>
-                                                <th class="py-2 px-4 border-b border-gray-300">Email</th>
-                                                <th class="py-2 px-4 border-b border-gray-300">Phone Number</th>
-                                                <th class="py-2 px-4 border-b border-gray-300">Experience</th>
-                                                <th class="py-2 px-4 border-b border-gray-300">Schedule Time</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>`;
-    groupingDetail.forEach(info => {
-        htmlTemplate += `
-                                            <tr>
-                                                <td class="py-2 px-4 border-b border-gray-300">${info.fullName}</td>
-                                                <td class="py-2 px-4 border-b border-gray-300">${info.email}</td>
-                                                <td class="py-2 px-4 border-b border-gray-300">${info.phoneNumber}</td>
-                                                <td class="py-2 px-4 border-b border-gray-300">${info.experience} years</td>
-                                                <td class="py-2 px-4 border-b border-gray-300">${info.schedule}</td>
-                                            </tr>`;
-    });
-    htmlTemplate += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>`;
-
-    htmlTemplate += `
+            <div class="bg-white">
+                <div class="text-center">
+                    <img src="https://staging.zinterview.ai/zi-favicon.png" alt="logo" class="logo" width="50">
+                </div>
+                <h3 class="role">Role - ${title}</h3>
+                <div class="overflow-x-auto">
+                    <table class="info-table">
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Phone Number</th>
+                                <th>Experience</th>
+                                <th>Schedule Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${groupingDetail?.map(info => `
+                                <tr>
+                                    <td >${info?.firstName} ${info?.lastName}</td>
+                                    <td >${info?.email}</td>
+                                    <td >${info?.phoneNumber}</td>
+                                    <td >${info?.experience} years</td>
+                                    <td >${getFormattedDateTime4(info?.schedule)}</td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </body>
@@ -147,21 +132,27 @@ const sendEmailToAdminWhoAreNotJoin = async (groupingDetail, supportEmail, openi
     let mailOptions = {
         from: '"zinterview.ai support" <support@zinterview.ai>',
         to: supportEmail,
-        subject: `Total ${groupingDetail?.length} candidates were not join with opening ID - ${openingId}.`,
+        subject: `${groupingDetail?.length} ${groupingDetail?.length <= 1 ? 'candidate' : 'candidates'} did not join for the opening with ID- ${openingId}.`,
         html: htmlTemplate,
     };
-    transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-            console.error("Error sending Reminder email: ", err);
-        } else {
-            console.log("Email send to admin : ", info.response);
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            let info = await transporter.sendMail(mailOptions);
+            console.log("Email sent to admin:", info.response);
+            break;
+        } catch (err) {
+            console.error(`Attempt ${attempt} - Error sending Reminder email: `, err);
+            if (attempt === retries) {
+                console.error("Max retries reached. Failed to send email.");
+            }
         }
-    });
-}
+    }
+};
 
 const sendEmailsToAllUsers = async () => {
+    const now = new Date();
     try {
-        const now = new Date();
         const twentyFourHoursAgo = new Date();
         twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
         let { openings, userinterviewreports } = await dbconnect();
@@ -181,7 +172,9 @@ const sendEmailsToAllUsers = async () => {
             cancelled: false,
             interviewCompleted: false,
             activeSession: false
-        }).project({ opening: 1, firstName: 1, lastName: 1, email: 1, phoneNumber: 1, }).toArray();
+        }).project({ opening: 1, firstName: 1, lastName: 1, email: 1, phoneNumber: 1, experience: 1, schedule: 1 }).toArray();
+
+        console.log("Total interviewReport ", users?.length);
 
         const groupedUsers = users?.reduce((acc, user) => {
             const openingId = user?.opening.toString();
@@ -197,36 +190,31 @@ const sendEmailsToAllUsers = async () => {
         });
 
         const openingInfo = await openings.find({ _id: { $in: openingIds } }).project({ supportEmail: 1, title: 1 }).toArray();
+        console.log("openingInfo length -", openingInfo.length);
 
-        let groupingDetail = [];
-        Object.keys(groupedUsers)?.forEach(openingId => {
-            const usersInGroup = groupedUsers?.[openingId];
-            let candidateInfo = usersInGroup?.map(user => ({
-                fullName: `${user?.firstName} ${user?.lastName}`,
-                email: user?.email,
-                phoneNumber: user?.phoneNumber,
-                experience: user?.experience,
-                schedule: getFormattedDateTime4(user?.schedule)
-            }));
-            groupingDetail.push({
-                openingId,
-                candidateInfo
-            });
-        });
-
-        groupingDetail.forEach(groupingData => {
-            openingInfo.forEach(openingData => {
-                if (groupingData?.openingId === openingData?._id.toString()) {
-                    if (openingData?.supportEmail && openingData?.supportEmail?.length) {
-                        sendEmailToAdminWhoAreNotJoin(groupingData.candidateInfo, openingData.supportEmail, groupingData.openingId, openingData.title);
-                    }
+        for (const openingId of Object.keys(groupedUsers)) {
+            let candidateInfo = groupedUsers?.[openingId];
+            for (const openingData of openingInfo) {
+                if (openingData?._id?.toString() === openingId && openingData?.supportEmail && openingData?.supportEmail?.length && candidateInfo?.length) {
+                    await sendEmailToAdminWhoAreNotJoin(candidateInfo, openingData.supportEmail, openingId, openingData.title);
                 }
-            });
-        });
-
+            }
+        }
+        console.log("completed...");
+        const response = {
+            statusCode: 200,
+            body: JSON.stringify(`Successfully completed sending email to the admin at ${getFormattedDateTime4(now)}.`),
+        };
+        return response;
     } catch (error) {
-        console.error('Error sending to email to admin-', error);
+        console.error('Error sending email to admin ', error);
+        const response = {
+            statusCode: 500,
+            body: JSON.stringify(`Getting issue while sending email to the admin at ${getFormattedDateTime4(now)}. 
+            The error message is - ${error?.message}`),
+        };
+        return response;
     }
-}
+};
 
-module.exports = { sendEmailsToAllUsers }
+module.exports = { sendEmailsToAllUsers };

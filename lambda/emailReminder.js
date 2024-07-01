@@ -42,6 +42,8 @@ const sendEmail = (email, scheduleTime, openingTitle, orgName, uid, supportEmail
     const hour = scheduleDate.getUTCHours();
     const minute = scheduleDate.getUTCMinutes();
 
+    console.log(email, scheduleTime, openingTitle, orgName, uid, supportEmail, interviewUrl)
+
     const htmlTemplate = `
         <!DOCTYPE html>
         <html lang="en">
@@ -283,9 +285,12 @@ const OnetimeGetUserToSendReminderEmail = async () => {
         let opeaningIds = userInterviewReports.map((data) => {
             return new ObjectId(data?.opening);
         });
+        console.log("successfull find userInterviewReports", userInterviewReports.length);
         let opeaningData = await openings?.find({ _id: { $in: opeaningIds } }).project({ organizationId: 1, supportEmail: 1, title: 1 }).toArray();
+        console.log("successfull find opeaningData", opeaningData.length);
         let organizationIds = opeaningData?.map((data) => { return data?.organizationId });
         let organizationData = await organizations?.find({ _id: { $in: organizationIds } }).project({ organizationName: 1 }).toArray();
+        console.log("successfull find organizationData", organizationData.length);
 
         userInterviewReports?.forEach((eachUserInterviewReport) => {
             opeaningData?.forEach((eachOpening) => {
@@ -306,13 +311,24 @@ const OnetimeGetUserToSendReminderEmail = async () => {
                             interviewUrl: interviewUrl,
                             isCancel: false,
                         }
+                        console.log("send for scheduling---");
                         sendRemaindarEmail(obj);
                     }
                 })
             })
         })
+        const response = {
+            statusCode: 200,
+            body: JSON.stringify(`sucessfull`),
+        };
+        return response;
     } catch (error) {
         console.log("Error in getAllEmailForSendReminderEmail function", error);
+        const response = {
+            statusCode: 400,
+            body: JSON.stringify(`unsuccessfull`),
+        };
+        return response;
     }
 }
 

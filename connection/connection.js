@@ -1,10 +1,10 @@
 const { MongoClient } = require('mongodb');
 
 const url = process.env.MONGODB_URI;
-const client = new MongoClient(url);
-const databaseName = 'zinterview';
 async function dbconnect() {
     try {
+        const client = new MongoClient(url);
+        const databaseName = 'zinterview';
         await client.connect();
         const db = client.db(databaseName);
         const openings = db.collection('openings');

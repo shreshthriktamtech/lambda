@@ -12,7 +12,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.600.0",
+    "@aws-sdk/client-cloudwatch-events": "^3.606.0",
+    "@aws-sdk/client-lambda": "^3.606.0",
+    "@aws-sdk/client-ses": "^3.606.0",
+    "@aws-sdk/smithy-client": "^3.374.0",
+    "@aws-sdk/types": "^3.598.0",
+    "aws-sdk": "^2.1651.0",
     "dotenv": "^16.4.5",
     "ics": "^3.7.6",
     "moment": "^2.30.1",
